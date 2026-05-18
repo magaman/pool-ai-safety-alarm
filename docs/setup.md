@@ -17,7 +17,6 @@ Copy these folders into your Home Assistant config directory:
 ```text
 blueprints/automation/pool_ai_safety_alarm.yaml
 packages/pool_ai_helpers.yaml
-examples/suppression_handler.yaml
 docs/setup.md
 ```
 
@@ -29,6 +28,8 @@ homeassistant:
 ```
 
 Restart Home Assistant after adding the package so the helper entities are created.
+
+Home Assistant automation blueprints cannot create helpers during blueprint import. Importing the blueprint creates only the reusable automation definition; the `input_boolean`, `input_select`, `input_text`, and `timer` helpers must come from the package file or be created manually with the same entity IDs.
 
 ## Configure AI Task
 
@@ -55,7 +56,7 @@ SAFE, WATCH, EDGE_RISK, WATER_ENTRY, DISTRESS, DROWNING_RISK, ERROR
 8. Optionally choose siren entities. Sirens are triggered only for `DISTRESS` and `DROWNING_RISK`.
 9. Configure any custom action selectors for each severity.
 
-## Suppression Handler
+## Suppression Handling
 
 The blueprint includes mobile notification buttons for these statuses only:
 
@@ -64,7 +65,7 @@ The blueprint includes mobile notification buttons for these statuses only:
 - `WATER_ENTRY`
 - `ERROR`
 
-Use `examples/suppression_handler.yaml` as an automation to start suppression timers when those actions are tapped. Do not add suppression actions for `DISTRESS` or `DROWNING_RISK`; those critical statuses intentionally have no notification suppression buttons.
+The blueprint automation handles those button taps itself and starts the matching suppression timer. Do not add suppression actions for `DISTRESS` or `DROWNING_RISK`; those critical statuses intentionally have no notification suppression buttons.
 
 ## Helper Entities
 

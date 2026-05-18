@@ -127,8 +127,8 @@ blueprint:
       selector:
         action:
 
-mode: single
-max_exceeded: silent
+mode: queued
+max: 10
 
 variables:
   pool_camera: !input pool_camera
@@ -160,181 +160,246 @@ variables:
 
 triggers:
   - trigger: state
+    id: analyze_pool
     entity_id: !input trigger_entities
     to: "on"
-
-conditions:
-  - condition: state
-    entity_id: input_boolean.pool_ai_safety_enabled
-    state: "on"
-  - condition: and
-    conditions: !input run_conditions
+  - trigger: event
+    id: suppress_watch
+    event_type: mobile_app_notification_action
+    event_data:
+      action: POOL_AI_SUPPRESS_WATCH
+  - trigger: event
+    id: suppress_edge_risk
+    event_type: mobile_app_notification_action
+    event_data:
+      action: POOL_AI_SUPPRESS_EDGE_RISK
+  - trigger: event
+    id: suppress_water_entry
+    event_type: mobile_app_notification_action
+    event_data:
+      action: POOL_AI_SUPPRESS_WATER_ENTRY
+  - trigger: event
+    id: suppress_error
+    event_type: mobile_app_notification_action
+    event_data:
+      action: POOL_AI_SUPPRESS_ERROR
 
 actions:
-  - alias: Analyze the pool camera with Home Assistant AI Task
-    action: ai_task.generate_data
-    data:
-      task_name: Pool AI Safety Alarm
-      entity_id: "{{ ai_task_entity }}"
-      instructions: "{{ analysis_prompt }}"
-      structure:
-        status:
-          description: Pool safety status. Choose exactly one option.
-          selector:
-            select:
-              options:
-                - SAFE
-                - WATCH
-                - EDGE_RISK
-                - WATER_ENTRY
-                - DISTRESS
-                - DROWNING_RISK
-                - ERROR
-        confidence:
-          description: Confidence from 0 to 100.
-          selector:
-            number:
-              min: 0
-              max: 100
-              step: 1
-        summary:
-          description: Brief description of what is visible in the pool image.
-          selector:
-            text:
-        recommended_action:
-          description: Short recommended next action for the homeowner.
-          selector:
-            text:
-      attachments:
-        media_content_id: "media-source://camera/{{ pool_camera }}"
-        media_content_type: image/jpeg
-    response_variable: pool_ai_response
-    continue_on_error: true
-
-  - alias: Normalize the AI response
-    variables:
-      response_status: "{{ pool_ai_response.data.status | default('ERROR') | upper }}"
-      pool_ai_status: "{{ response_status if response_status in allowed_statuses else 'ERROR' }}"
-      pool_ai_confidence: "{{ pool_ai_response.data.confidence | default(0) }}"
-      pool_ai_summary: "{{ pool_ai_response.data.summary | default('Pool AI analysis failed or returned an invalid response.') }}"
-      pool_ai_recommended_action: "{{ pool_ai_response.data.recommended_action | default('Review the camera and verify pool safety immediately.') }}"
-      notification_title: "Pool safety: {{ pool_ai_status | replace('_', ' ') }}"
-      notification_message: >-
-        {{ pool_ai_summary }} Confidence: {{ pool_ai_confidence }}%.
-        Recommended action: {{ pool_ai_recommended_action }}
-      voice_message: >-
-        Pool safety alert. {{ pool_ai_status | replace('_', ' ') }}.
-        {{ pool_ai_recommended_action }}
-      suppression_timer: >-
-        {% if pool_ai_status == 'WATCH' %}timer.pool_ai_watch_suppression
-        {% elif pool_ai_status == 'EDGE_RISK' %}timer.pool_ai_edge_risk_suppression
-        {% elif pool_ai_status == 'WATER_ENTRY' %}timer.pool_ai_water_entry_suppression
-        {% elif pool_ai_status == 'DISTRESS' %}timer.pool_ai_distress_suppression
-        {% elif pool_ai_status == 'DROWNING_RISK' %}timer.pool_ai_drowning_risk_suppression
-        {% elif pool_ai_status == 'ERROR' %}timer.pool_ai_error_suppression
-        {% else %}{% endif %}
-      is_suppressed: "{{ suppression_timer | trim != '' and is_state(suppression_timer | trim, 'active') }}"
-
-  - alias: Store the current pool safety status
-    action: input_select.select_option
-    target:
-      entity_id: input_select.pool_ai_safety_status
-    data:
-      option: "{{ pool_ai_status }}"
-
-  - alias: Store the current pool safety summary
-    action: input_text.set_value
-    target:
-      entity_id: input_text.pool_ai_safety_summary
-    data:
-      value: "{{ notification_message[:255] }}"
-
-  - alias: Store the raw AI response
-    action: input_text.set_value
-    target:
-      entity_id: input_text.pool_ai_safety_raw_response
-    data:
-      value: "{{ pool_ai_response | default({}) | to_json | truncate(255, true, '') }}"
-
-  - alias: Send built-in mobile notifications
-    if:
-      - condition: template
-        value_template: "{{ pool_ai_status != 'SAFE' and not is_suppressed and mobile_notify_devices | count > 0 }}"
-    then:
-      - repeat:
-          for_each: "{{ mobile_notify_devices }}"
-          sequence:
-            - variables:
-                notify_service: "notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}"
-            - choose:
-                - conditions: "{{ pool_ai_status in ['WATCH', 'EDGE_RISK', 'WATER_ENTRY', 'ERROR'] }}"
-                  sequence:
-                    - action: "{{ notify_service }}"
-                      data:
-                        title: "{{ notification_title }}"
-                        message: "{{ notification_message }}"
-                        data:
-                          tag: "pool_ai_safety_alarm"
-                          group: "pool_ai_safety"
-                          actions:
-                            - action: "POOL_AI_SUPPRESS_{{ pool_ai_status }}"
-                              title: "Suppress {{ pool_ai_status | replace('_', ' ') }}"
-                - conditions: "{{ pool_ai_status in ['DISTRESS', 'DROWNING_RISK'] }}"
-                  sequence:
-                    - action: "{{ notify_service }}"
-                      data:
-                        title: "{{ notification_title }}"
-                        message: "{{ notification_message }}"
-                        data:
-                          tag: "pool_ai_safety_alarm"
-                          group: "pool_ai_safety"
-                          push:
-                            sound:
-                              name: default
-                              critical: 1
-                              volume: 1.0
-
-  - alias: Speak water-entry and critical pool alerts
-    if:
-      - condition: template
-        value_template: >-
-          {{ pool_ai_status in ['WATER_ENTRY', 'DISTRESS', 'DROWNING_RISK']
-             and not is_suppressed
-             and tts_engine | trim != ''
-             and speaker_entities | count > 0 }}
-    then:
-      - action: tts.speak
-        target:
-          entity_id: "{{ tts_engine }}"
-        data:
-          media_player_entity_id: "{{ speaker_entities }}"
-          message: "{{ voice_message }}"
-
-  - alias: Turn on sirens for critical pool alerts
-    if:
-      - condition: template
-        value_template: >-
-          {{ pool_ai_status in ['DISTRESS', 'DROWNING_RISK']
-             and not is_suppressed
-             and siren_entities | count > 0 }}
-    then:
-      - action: siren.turn_on
-        target:
-          entity_id: "{{ siren_entities }}"
-
-  - alias: Run configured severity actions
+  - alias: Route analysis and notification suppression triggers
     choose:
-      - conditions: "{{ pool_ai_status == 'SAFE' }}"
-        sequence: !input safe_actions
-      - conditions: "{{ pool_ai_status == 'WATCH' and not is_suppressed }}"
-        sequence: !input watch_actions
-      - conditions: "{{ pool_ai_status == 'EDGE_RISK' and not is_suppressed }}"
-        sequence: !input edge_risk_actions
-      - conditions: "{{ pool_ai_status == 'WATER_ENTRY' and not is_suppressed }}"
-        sequence: !input water_entry_actions
-      - conditions: "{{ pool_ai_status == 'DISTRESS' and not is_suppressed }}"
-        sequence: !input distress_actions
-      - conditions: "{{ pool_ai_status == 'DROWNING_RISK' and not is_suppressed }}"
-        sequence: !input drowning_risk_actions
-      - conditions: "{{ pool_ai_status == 'ERROR' and not is_suppressed }}"
-        sequence: !input error_actions
+      - conditions:
+          - condition: trigger
+            id: suppress_watch
+        sequence:
+          - action: timer.start
+            target:
+              entity_id: timer.pool_ai_watch_suppression
+            data:
+              duration: "00:15:00"
+
+      - conditions:
+          - condition: trigger
+            id: suppress_edge_risk
+        sequence:
+          - action: timer.start
+            target:
+              entity_id: timer.pool_ai_edge_risk_suppression
+            data:
+              duration: "00:10:00"
+
+      - conditions:
+          - condition: trigger
+            id: suppress_water_entry
+        sequence:
+          - action: timer.start
+            target:
+              entity_id: timer.pool_ai_water_entry_suppression
+            data:
+              duration: "00:05:00"
+
+      - conditions:
+          - condition: trigger
+            id: suppress_error
+        sequence:
+          - action: timer.start
+            target:
+              entity_id: timer.pool_ai_error_suppression
+            data:
+              duration: "00:30:00"
+
+      - conditions:
+          - condition: trigger
+            id: analyze_pool
+          - condition: state
+            entity_id: input_boolean.pool_ai_safety_enabled
+            state: "on"
+          - condition: and
+            conditions: !input run_conditions
+        sequence:
+          - alias: Analyze the pool camera with Home Assistant AI Task
+            action: ai_task.generate_data
+            data:
+              task_name: Pool AI Safety Alarm
+              entity_id: "{{ ai_task_entity }}"
+              instructions: "{{ analysis_prompt }}"
+              structure:
+                status:
+                  description: Pool safety status. Choose exactly one option.
+                  selector:
+                    select:
+                      options:
+                        - SAFE
+                        - WATCH
+                        - EDGE_RISK
+                        - WATER_ENTRY
+                        - DISTRESS
+                        - DROWNING_RISK
+                        - ERROR
+                confidence:
+                  description: Confidence from 0 to 100.
+                  selector:
+                    number:
+                      min: 0
+                      max: 100
+                      step: 1
+                summary:
+                  description: Brief description of what is visible in the pool image.
+                  selector:
+                    text:
+                recommended_action:
+                  description: Short recommended next action for the homeowner.
+                  selector:
+                    text:
+              attachments:
+                media_content_id: "media-source://camera/{{ pool_camera }}"
+                media_content_type: image/jpeg
+            response_variable: pool_ai_response
+            continue_on_error: true
+
+          - alias: Normalize the AI response
+            variables:
+              response_status: "{{ pool_ai_response.data.status | default('ERROR') | upper }}"
+              pool_ai_status: "{{ response_status if response_status in allowed_statuses else 'ERROR' }}"
+              pool_ai_confidence: "{{ pool_ai_response.data.confidence | default(0) }}"
+              pool_ai_summary: "{{ pool_ai_response.data.summary | default('Pool AI analysis failed or returned an invalid response.') }}"
+              pool_ai_recommended_action: "{{ pool_ai_response.data.recommended_action | default('Review the camera and verify pool safety immediately.') }}"
+              notification_title: "Pool safety: {{ pool_ai_status | replace('_', ' ') }}"
+              notification_message: >-
+                {{ pool_ai_summary }} Confidence: {{ pool_ai_confidence }}%.
+                Recommended action: {{ pool_ai_recommended_action }}
+              voice_message: >-
+                Pool safety alert. {{ pool_ai_status | replace('_', ' ') }}.
+                {{ pool_ai_recommended_action }}
+              suppression_timer: >-
+                {% if pool_ai_status == 'WATCH' %}timer.pool_ai_watch_suppression
+                {% elif pool_ai_status == 'EDGE_RISK' %}timer.pool_ai_edge_risk_suppression
+                {% elif pool_ai_status == 'WATER_ENTRY' %}timer.pool_ai_water_entry_suppression
+                {% elif pool_ai_status == 'DISTRESS' %}timer.pool_ai_distress_suppression
+                {% elif pool_ai_status == 'DROWNING_RISK' %}timer.pool_ai_drowning_risk_suppression
+                {% elif pool_ai_status == 'ERROR' %}timer.pool_ai_error_suppression
+                {% else %}{% endif %}
+              is_suppressed: "{{ suppression_timer | trim != '' and is_state(suppression_timer | trim, 'active') }}"
+
+          - alias: Store the current pool safety status
+            action: input_select.select_option
+            target:
+              entity_id: input_select.pool_ai_safety_status
+            data:
+              option: "{{ pool_ai_status }}"
+
+          - alias: Store the current pool safety summary
+            action: input_text.set_value
+            target:
+              entity_id: input_text.pool_ai_safety_summary
+            data:
+              value: "{{ notification_message[:255] }}"
+
+          - alias: Store the raw AI response
+            action: input_text.set_value
+            target:
+              entity_id: input_text.pool_ai_safety_raw_response
+            data:
+              value: "{{ pool_ai_response | default({}) | to_json | truncate(255, true, '') }}"
+
+          - alias: Send built-in mobile notifications
+            if:
+              - condition: template
+                value_template: "{{ pool_ai_status != 'SAFE' and not is_suppressed and mobile_notify_devices | count > 0 }}"
+            then:
+              - repeat:
+                  for_each: "{{ mobile_notify_devices }}"
+                  sequence:
+                    - variables:
+                        notify_service: "notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}"
+                    - choose:
+                        - conditions: "{{ pool_ai_status in ['WATCH', 'EDGE_RISK', 'WATER_ENTRY', 'ERROR'] }}"
+                          sequence:
+                            - action: "{{ notify_service }}"
+                              data:
+                                title: "{{ notification_title }}"
+                                message: "{{ notification_message }}"
+                                data:
+                                  tag: "pool_ai_safety_alarm"
+                                  group: "pool_ai_safety"
+                                  actions:
+                                    - action: "POOL_AI_SUPPRESS_{{ pool_ai_status }}"
+                                      title: "Suppress {{ pool_ai_status | replace('_', ' ') }}"
+                        - conditions: "{{ pool_ai_status in ['DISTRESS', 'DROWNING_RISK'] }}"
+                          sequence:
+                            - action: "{{ notify_service }}"
+                              data:
+                                title: "{{ notification_title }}"
+                                message: "{{ notification_message }}"
+                                data:
+                                  tag: "pool_ai_safety_alarm"
+                                  group: "pool_ai_safety"
+                                  push:
+                                    sound:
+                                      name: default
+                                      critical: 1
+                                      volume: 1.0
+
+          - alias: Speak water-entry and critical pool alerts
+            if:
+              - condition: template
+                value_template: >-
+                  {{ pool_ai_status in ['WATER_ENTRY', 'DISTRESS', 'DROWNING_RISK']
+                     and not is_suppressed
+                     and tts_engine | trim != ''
+                     and speaker_entities | count > 0 }}
+            then:
+              - action: tts.speak
+                target:
+                  entity_id: "{{ tts_engine }}"
+                data:
+                  media_player_entity_id: "{{ speaker_entities }}"
+                  message: "{{ voice_message }}"
+
+          - alias: Turn on sirens for critical pool alerts
+            if:
+              - condition: template
+                value_template: >-
+                  {{ pool_ai_status in ['DISTRESS', 'DROWNING_RISK']
+                     and not is_suppressed
+                     and siren_entities | count > 0 }}
+            then:
+              - action: siren.turn_on
+                target:
+                  entity_id: "{{ siren_entities }}"
+
+          - alias: Run configured severity actions
+            choose:
+              - conditions: "{{ pool_ai_status == 'SAFE' }}"
+                sequence: !input safe_actions
+              - conditions: "{{ pool_ai_status == 'WATCH' and not is_suppressed }}"
+                sequence: !input watch_actions
+              - conditions: "{{ pool_ai_status == 'EDGE_RISK' and not is_suppressed }}"
+                sequence: !input edge_risk_actions
+              - conditions: "{{ pool_ai_status == 'WATER_ENTRY' and not is_suppressed }}"
+                sequence: !input water_entry_actions
+              - conditions: "{{ pool_ai_status == 'DISTRESS' and not is_suppressed }}"
+                sequence: !input distress_actions
+              - conditions: "{{ pool_ai_status == 'DROWNING_RISK' and not is_suppressed }}"
+                sequence: !input drowning_risk_actions
+              - conditions: "{{ pool_ai_status == 'ERROR' and not is_suppressed }}"
+                sequence: !input error_actions

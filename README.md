@@ -29,6 +29,7 @@ Trigger entity turns on
   -> Helper entities store status and summary
   -> Suppression timers are checked
   -> Built-in notifications, speakers, and sirens run
+  -> Notification suppression button taps are handled by the same automation
   -> Optional per-severity custom actions run
 ```
 
@@ -57,8 +58,6 @@ blueprints/
     pool_ai_safety_alarm.yaml
 packages/
   pool_ai_helpers.yaml
-examples/
-  suppression_handler.yaml
 docs/
   setup.md
 ```
@@ -84,9 +83,10 @@ homeassistant:
 
 4. Restart Home Assistant so the helpers and timers are created.
 5. Configure an automation from the blueprint.
-6. Add `examples/suppression_handler.yaml` as an automation if you want mobile notification suppression buttons to start timers.
 
 See [docs/setup.md](docs/setup.md) for detailed setup and testing steps.
+
+Blueprint import does not create Home Assistant helpers. The helper package must still be installed through YAML packages or recreated manually in the UI before the automation runs.
 
 ## Notification Targets
 
