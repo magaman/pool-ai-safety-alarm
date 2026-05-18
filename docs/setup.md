@@ -7,8 +7,8 @@ This package adds an AI-assisted pool monitoring blueprint for Home Assistant. I
 - Home Assistant with YAML mode access.
 - A camera entity that can see the pool area.
 - Trigger entities that turn `on` for events such as UniFi Protect person detection, motion, door open, or gate open.
-- The LLM Vision custom integration installed and configured with at least one provider.
-- Optional mobile app notification services, speakers, a TTS engine, and siren entities.
+- A configured Home Assistant AI Task entity that supports image attachments.
+- Optional Home Assistant Companion App devices, speakers, a TTS engine, and siren entities.
 
 ## Install Files
 
@@ -30,15 +30,14 @@ homeassistant:
 
 Restart Home Assistant after adding the package so the helper entities are created.
 
-## Configure LLM Vision
+## Configure AI Task
 
-1. Install LLM Vision through HACS or the integration's documented install path.
-2. Add a provider in LLM Vision.
-3. Open the LLM Vision image analyzer UI and select your provider.
-4. Copy the provider/config entry ID and paste it into the blueprint's `LLM Vision provider ID` field.
-5. Leave the model field blank unless you need a specific model override.
+1. Configure an AI provider in Home Assistant that exposes AI Task support.
+2. Add an AI Task sub-entry/entity for that provider.
+3. Confirm the AI Task entity can process camera/image attachments.
+4. Select that `ai_task.*` entity in the blueprint's `AI Task entity` field.
 
-The blueprint calls `llmvision.image_analyzer` with structured JSON and expects one of these statuses:
+The blueprint calls `ai_task.generate_data` with a structured response and expects one of these statuses:
 
 ```text
 SAFE, WATCH, EDGE_RISK, WATER_ENTRY, DISTRESS, DROWNING_RISK, ERROR
@@ -49,17 +48,12 @@ SAFE, WATCH, EDGE_RISK, WATER_ENTRY, DISTRESS, DROWNING_RISK, ERROR
 1. In Home Assistant, go to Settings > Automations & scenes > Blueprints.
 2. Import or select `Pool AI Safety Alarm`.
 3. Choose the pool camera entity.
-4. Add trigger entities. UniFi Protect person detection, motion sensors, gate sensors, and door sensors should work when their alert state is `on`.
-5. Add mobile app notify services, one per line or comma-separated:
-
-```text
-notify.mobile_app_janes_iphone
-notify.mobile_app_pool_ipad
-```
-
-6. Optionally choose speaker entities and enter a TTS engine such as `tts.home_assistant_cloud`.
-7. Optionally choose siren entities. Sirens are triggered only for `DISTRESS` and `DROWNING_RISK`.
-8. Configure any custom action selectors for each severity.
+4. Choose the AI Task entity.
+5. Add trigger entities. UniFi Protect person detection, motion sensors, gate sensors, and door sensors should work when their alert state is `on`.
+6. Select one or more Home Assistant Companion App devices for mobile notifications.
+7. Optionally choose speaker entities and enter a TTS engine such as `tts.home_assistant_cloud`.
+8. Optionally choose siren entities. Sirens are triggered only for `DISTRESS` and `DROWNING_RISK`.
+9. Configure any custom action selectors for each severity.
 
 ## Suppression Handler
 
@@ -97,8 +91,8 @@ Critical timers exist for local admin automations, maintenance windows, or manua
 Test during a supervised, safe scenario before relying on any alert:
 
 1. Confirm trigger entities turn `on`.
-2. Confirm LLM Vision can analyze the selected camera.
-3. Confirm each mobile app notify service works.
+2. Confirm the selected AI Task entity can analyze the selected camera.
+3. Confirm each selected Companion App device receives notifications.
 4. Confirm speaker volume and TTS output are appropriate.
 5. Confirm sirens are selected only where immediate audible alerts are desired.
-6. Watch Home Assistant logs for LLM Vision errors, unavailable entities, or invalid service names.
+6. Watch Home Assistant logs for AI Task errors, unavailable entities, or notification service-name mismatches.

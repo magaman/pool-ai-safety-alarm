@@ -1,6 +1,6 @@
 # Pool AI Safety Alarm for Home Assistant
 
-AI-assisted pool monitoring for Home Assistant using UniFi Protect-style triggers, a camera snapshot, and LLM Vision image analysis.
+AI-assisted pool monitoring for Home Assistant using UniFi Protect-style triggers, a camera snapshot, and Home Assistant AI Task image analysis.
 
 This project is a supplemental alerting aid only. It is not a certified drowning detection system and must not replace direct supervision, locked barriers, pool covers, certified alarms, rescue equipment, or emergency services. AI vision can miss events, misclassify images, or fail during network, camera, provider, or Home Assistant outages.
 
@@ -24,8 +24,8 @@ In Home Assistant, go to Settings > Automations & scenes > Blueprints > Import B
 
 ```text
 Trigger entity turns on
-  -> Pool camera image is sent to LLM Vision
-  -> AI returns structured JSON
+  -> Pool camera image is sent to an AI Task entity
+  -> AI returns structured data
   -> Helper entities store status and summary
   -> Suppression timers are checked
   -> Built-in notifications, speakers, and sirens run
@@ -66,10 +66,10 @@ docs/
 ## Requirements
 
 - Home Assistant with YAML access.
-- LLM Vision installed and configured with a provider.
+- A configured Home Assistant AI Task entity that supports image attachments.
 - A camera entity pointed at the pool area.
 - Trigger entities such as UniFi Protect person detection, motion sensors, gate sensors, or door sensors.
-- Optional mobile app notify services, speakers, a TTS engine, and siren entities.
+- Optional Home Assistant Companion App devices, speakers, a TTS engine, and siren entities.
 
 ## Setup
 
@@ -90,12 +90,7 @@ See [docs/setup.md](docs/setup.md) for detailed setup and testing steps.
 
 ## Notification Targets
 
-Mobile app notification targets are entered as notify services, one per line or comma-separated:
-
-```text
-notify.mobile_app_janes_iphone
-notify.mobile_app_pool_ipad
-```
+Mobile notification targets are selected directly in the blueprint from Home Assistant Companion App devices. The blueprint derives the matching `notify.mobile_app_*` service from each selected device name.
 
 Critical `DISTRESS` and `DROWNING_RISK` notifications do not include suppression buttons.
 
