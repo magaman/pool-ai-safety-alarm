@@ -73,20 +73,12 @@ docs/
 ## Setup
 
 1. Import the blueprint from the raw URL above.
-2. Copy `packages/pool_ai_helpers.yaml` into your Home Assistant `packages/` directory.
-3. If packages are not enabled, add this to `configuration.yaml`:
-
-```yaml
-homeassistant:
-  packages: !include_dir_named packages
-```
-
-4. Restart Home Assistant so the helpers and timers are created.
-5. Configure an automation from the blueprint.
+2. Create the required helpers in the Home Assistant UI.
+3. Configure an automation from the blueprint.
 
 See [docs/setup.md](docs/setup.md) for detailed setup and testing steps.
 
-Blueprint import does not create Home Assistant helpers. The helper package must still be installed through YAML packages or recreated manually in the UI before the automation runs.
+Blueprint import does not create Home Assistant helpers. Create them from Settings > Devices & services > Helpers before enabling the automation. `packages/pool_ai_helpers.yaml` remains available as an optional YAML shortcut for advanced users.
 
 ## Notification Targets
 
@@ -96,12 +88,17 @@ Critical `DISTRESS` and `DROWNING_RISK` notifications do not include suppression
 
 ## Helpers
 
-The helper package creates:
+Create these helpers in the UI with the exact entity IDs:
 
 - `input_boolean.pool_ai_safety_enabled`
 - `input_select.pool_ai_safety_status`
 - `input_text.pool_ai_safety_summary`
 - `input_text.pool_ai_safety_raw_response`
-- suppression timers for `WATCH`, `EDGE_RISK`, `WATER_ENTRY`, `DISTRESS`, `DROWNING_RISK`, and `ERROR`
+- `timer.pool_ai_watch_suppression`
+- `timer.pool_ai_edge_risk_suppression`
+- `timer.pool_ai_water_entry_suppression`
+- `timer.pool_ai_distress_suppression`
+- `timer.pool_ai_drowning_risk_suppression`
+- `timer.pool_ai_error_suppression`
 
 Critical timers exist for local admin automations, maintenance windows, or manual overrides. The included notification flow does not expose critical suppression buttons.

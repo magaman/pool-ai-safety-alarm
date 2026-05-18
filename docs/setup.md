@@ -10,26 +10,21 @@ This package adds an AI-assisted pool monitoring blueprint for Home Assistant. I
 - A configured Home Assistant AI Task entity that supports image attachments.
 - Optional Home Assistant Companion App devices, speakers, a TTS engine, and siren entities.
 
-## Install Files
+## Import the Blueprint
 
-Copy these folders into your Home Assistant config directory:
+Import this blueprint in Home Assistant:
 
 ```text
 blueprints/automation/pool_ai_safety_alarm.yaml
-packages/pool_ai_helpers.yaml
-docs/setup.md
 ```
 
-If you do not already use packages, add this to `configuration.yaml`:
+Raw import URL:
 
-```yaml
-homeassistant:
-  packages: !include_dir_named packages
+```text
+https://raw.githubusercontent.com/magaman/pool-ai-safety-alarm/main/blueprints/automation/pool_ai_safety_alarm.yaml
 ```
 
-Restart Home Assistant after adding the package so the helper entities are created.
-
-Home Assistant automation blueprints cannot create helpers during blueprint import. Importing the blueprint creates only the reusable automation definition; the `input_boolean`, `input_select`, `input_text`, and `timer` helpers must come from the package file or be created manually with the same entity IDs.
+Home Assistant automation blueprints cannot create helpers during blueprint import. Importing the blueprint creates only the reusable automation definition. Create the helpers below before enabling the automation.
 
 ## Configure AI Task
 
@@ -43,6 +38,57 @@ The blueprint calls `ai_task.generate_data` with a structured response and expec
 ```text
 SAFE, WATCH, EDGE_RISK, WATER_ENTRY, DISTRESS, DROWNING_RISK, ERROR
 ```
+
+## Create Helpers in the UI
+
+In Home Assistant, go to Settings > Devices & services > Helpers, then create these helpers. After each helper is created, open its settings and confirm the entity ID exactly matches the value shown here.
+
+### Toggle Helper
+
+Create a Toggle helper:
+
+| Field | Value |
+| --- | --- |
+| Name | Pool AI Safety Enabled |
+| Entity ID | `input_boolean.pool_ai_safety_enabled` |
+| Icon | `mdi:pool` |
+| Initial state | On |
+
+### Dropdown Helper
+
+Create a Dropdown helper:
+
+| Field | Value |
+| --- | --- |
+| Name | Pool AI Safety Status |
+| Entity ID | `input_select.pool_ai_safety_status` |
+| Icon | `mdi:pool-thermometer` |
+| Options | `SAFE`, `WATCH`, `EDGE_RISK`, `WATER_ENTRY`, `DISTRESS`, `DROWNING_RISK`, `ERROR` |
+| Initial option | `SAFE` |
+
+### Text Helpers
+
+Create two Text helpers:
+
+| Name | Entity ID | Max length | Initial value |
+| --- | --- | --- | --- |
+| Pool AI Safety Summary | `input_text.pool_ai_safety_summary` | `255` | `No pool AI analysis has run yet.` |
+| Pool AI Safety Raw Response | `input_text.pool_ai_safety_raw_response` | `255` | `{}` |
+
+### Timer Helpers
+
+Create these Timer helpers:
+
+| Name | Entity ID | Duration |
+| --- | --- | --- |
+| Pool AI WATCH Suppression | `timer.pool_ai_watch_suppression` | `00:15:00` |
+| Pool AI EDGE_RISK Suppression | `timer.pool_ai_edge_risk_suppression` | `00:10:00` |
+| Pool AI WATER_ENTRY Suppression | `timer.pool_ai_water_entry_suppression` | `00:05:00` |
+| Pool AI DISTRESS Suppression | `timer.pool_ai_distress_suppression` | `00:02:00` |
+| Pool AI DROWNING_RISK Suppression | `timer.pool_ai_drowning_risk_suppression` | `00:01:00` |
+| Pool AI ERROR Suppression | `timer.pool_ai_error_suppression` | `00:30:00` |
+
+YAML users can alternatively copy `packages/pool_ai_helpers.yaml` into a packages directory and restart Home Assistant.
 
 ## Create the Blueprint Automation
 
@@ -67,25 +113,7 @@ The blueprint includes mobile notification buttons for these statuses only:
 
 The blueprint automation handles those button taps itself and starts the matching suppression timer. Do not add suppression actions for `DISTRESS` or `DROWNING_RISK`; those critical statuses intentionally have no notification suppression buttons.
 
-## Helper Entities
-
-The package creates these state helpers:
-
-- `input_boolean.pool_ai_safety_enabled`
-- `input_select.pool_ai_safety_status`
-- `input_text.pool_ai_safety_summary`
-- `input_text.pool_ai_safety_raw_response`
-
-It also creates suppression timers for:
-
-- `timer.pool_ai_watch_suppression`
-- `timer.pool_ai_edge_risk_suppression`
-- `timer.pool_ai_water_entry_suppression`
-- `timer.pool_ai_distress_suppression`
-- `timer.pool_ai_drowning_risk_suppression`
-- `timer.pool_ai_error_suppression`
-
-Critical timers exist for local admin automations, maintenance windows, or manual overrides. The included notification flow does not expose critical suppression buttons.
+Critical suppression timers exist for local admin automations, maintenance windows, or manual overrides. The included notification flow does not expose critical suppression buttons.
 
 ## Testing
 
