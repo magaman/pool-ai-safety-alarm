@@ -1,0 +1,54 @@
+alias: Pool AI Safety Suppression Handler
+description: >
+  Example automation that handles iOS and mobile app actionable notifications
+  for suppressible Pool AI Safety statuses.
+mode: queued
+max: 10
+
+triggers:
+  - trigger: event
+    event_type: mobile_app_notification_action
+
+conditions:
+  - condition: template
+    value_template: >-
+      {{ trigger.event.data.action in [
+        'POOL_AI_SUPPRESS_WATCH',
+        'POOL_AI_SUPPRESS_EDGE_RISK',
+        'POOL_AI_SUPPRESS_WATER_ENTRY',
+        'POOL_AI_SUPPRESS_ERROR'
+      ] }}
+
+actions:
+  - choose:
+      - conditions: "{{ trigger.event.data.action == 'POOL_AI_SUPPRESS_WATCH' }}"
+        sequence:
+          - action: timer.start
+            target:
+              entity_id: timer.pool_ai_watch_suppression
+            data:
+              duration: "00:15:00"
+
+      - conditions: "{{ trigger.event.data.action == 'POOL_AI_SUPPRESS_EDGE_RISK' }}"
+        sequence:
+          - action: timer.start
+            target:
+              entity_id: timer.pool_ai_edge_risk_suppression
+            data:
+              duration: "00:10:00"
+
+      - conditions: "{{ trigger.event.data.action == 'POOL_AI_SUPPRESS_WATER_ENTRY' }}"
+        sequence:
+          - action: timer.start
+            target:
+              entity_id: timer.pool_ai_water_entry_suppression
+            data:
+              duration: "00:05:00"
+
+      - conditions: "{{ trigger.event.data.action == 'POOL_AI_SUPPRESS_ERROR' }}"
+        sequence:
+          - action: timer.start
+            target:
+              entity_id: timer.pool_ai_error_suppression
+            data:
+              duration: "00:30:00"

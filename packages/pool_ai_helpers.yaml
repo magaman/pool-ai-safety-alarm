@@ -1,0 +1,63 @@
+input_boolean:
+  pool_ai_safety_enabled:
+    name: Pool AI Safety Enabled
+    icon: mdi:pool
+    initial: true
+
+input_select:
+  pool_ai_safety_status:
+    name: Pool AI Safety Status
+    icon: mdi:pool-thermometer
+    options:
+      - SAFE
+      - WATCH
+      - EDGE_RISK
+      - WATER_ENTRY
+      - DISTRESS
+      - DROWNING_RISK
+      - ERROR
+    initial: SAFE
+
+input_text:
+  pool_ai_safety_summary:
+    name: Pool AI Safety Summary
+    icon: mdi:text-box-search-outline
+    max: 255
+    initial: "No pool AI analysis has run yet."
+
+  pool_ai_safety_raw_response:
+    name: Pool AI Safety Raw Response
+    icon: mdi:code-json
+    max: 255
+    initial: "{}"
+
+timer:
+  pool_ai_watch_suppression:
+    name: Pool AI WATCH Suppression
+    icon: mdi:timer-pause-outline
+    duration: "00:15:00"
+
+  pool_ai_edge_risk_suppression:
+    name: Pool AI EDGE_RISK Suppression
+    icon: mdi:timer-alert-outline
+    duration: "00:10:00"
+
+  pool_ai_water_entry_suppression:
+    name: Pool AI WATER_ENTRY Suppression
+    icon: mdi:timer-alert
+    duration: "00:05:00"
+
+  pool_ai_distress_suppression:
+    name: Pool AI DISTRESS Suppression
+    icon: mdi:timer-lock-outline
+    duration: "00:02:00"
+
+  pool_ai_drowning_risk_suppression:
+    name: Pool AI DROWNING_RISK Suppression
+    icon: mdi:timer-lock
+    duration: "00:01:00"
+
+  pool_ai_error_suppression:
+    name: Pool AI ERROR Suppression
+    icon: mdi:timer-cog-outline
+    duration: "00:30:00"
