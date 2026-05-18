@@ -32,13 +32,6 @@ blueprint:
         entity:
           multiple: true
 
-    run_conditions:
-      name: Extra run conditions
-      description: Optional conditions that must be true before analysis runs.
-      default: []
-      selector:
-        condition: {}
-
     mobile_notify_devices:
       name: Mobile app notification devices
       description: >
@@ -233,8 +226,6 @@ actions:
           - condition: state
             entity_id: input_boolean.pool_ai_safety_enabled
             state: "on"
-          - condition: and
-            conditions: !input run_conditions
         sequence:
           - alias: Analyze the pool camera with Home Assistant AI Task
             action: ai_task.generate_data
